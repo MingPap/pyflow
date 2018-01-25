@@ -28,7 +28,7 @@ public:
 	static void SanityCheck(const DImage& imdx,const DImage& imdy,const DImage& imdt,double du,double dv);
 	static void warpFL(DImage& warpIm2,const DImage& Im1,const DImage& Im2,const DImage& vx,const DImage& vy);
 	static void warpFL(DImage& warpIm2,const DImage& Im1,const DImage& Im2,const DImage& flow);
-
+	static void warpMaskFL(DImage& warpMask,const DImage& Mask,const DImage& vx,const DImage& vy);
 
 	static void genConstFlow(DImage& flow,double value,int width,int height);
 	static void genInImageMask(DImage& mask,const DImage& vx,const DImage& vy,int interval = 0);

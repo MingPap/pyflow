@@ -129,6 +129,12 @@ void OpticalFlow::warpFL(DImage &warpIm2, const DImage &Im1, const DImage &Im2, 
 	ImageProcessing::warpImageFlow(warpIm2.data(),Im1.data(),Im2.data(),Flow.data(),Im2.width(),Im2.height(),Im2.nchannels());
 }
 
+void OpticalFlow::warpMaskFL(DImage& warpMask,const DImage& Mask,const DImage& vx,const DImage& vy)
+{
+	if(warpMask.matchDimension(Mask)==false)
+		warpMask.allocate(Mask.width(),Mask.height(),Mask.nchannels());
+	ImageProcessing::warpImage(warpMask.data(),Mask.data(),vx.data(),vy.data(),Mask.width(),Mask.height(),Mask.nchannels());
+}
 
 //--------------------------------------------------------------------------------------------------------
 // function to generate mask of the pixels that move inside the image boundary

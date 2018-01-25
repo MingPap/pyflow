@@ -19,8 +19,8 @@ parser.add_argument(
 args = parser.parse_args()
 
 examples_dir = "./examples"
-im1 = np.array(Image.open(os.path.join(examples_dir, 'img1.jpg')))
-im2 = np.array(Image.open(os.path.join(examples_dir, 'img2.jpg')))
+im1 = np.array(Image.open(os.path.join(examples_dir, 'car1.jpg')))
+im2 = np.array(Image.open(os.path.join(examples_dir, 'car2.jpg')))
 im1 = im1.astype(float) / 255.
 im2 = im2.astype(float) / 255.
 

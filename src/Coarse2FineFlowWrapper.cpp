@@ -49,3 +49,33 @@ void Coarse2FineFlowWrapper(double * vx, double * vy, double * warpI2,
 
   return;
 }
+
+void warpMaskFL(double *warpMask, const double *Mask,
+                const double *vx, const double *vy,
+                int colType, int h, int w, int c) {
+  
+  DImage MaskFormatted, vxFormatted, vyFormatted, warpMaskFormatted;
+
+  // format input in the format needed by backend
+  MaskFormatted.allocate(w, h, c);
+  memcpy(MaskFormatted.pData, Mask, h * w * c * sizeof(double));
+  MaskFormatted.setColorType(colType);
+  vxFormatted.allocate(w, h);
+  memcpy(vxFormatted.pData, vx, h * w * sizeof(double));
+  vyFormatted.allocate(w, h);
+  memcpy(vyFormatted.pData, vy, h * w * sizeof(double));
+
+  // call optical flow backend
+  OpticalFlow::warpMaskFL(warpMaskFormatted, MaskFormatted, vxFormatted, vyFormatted);
+
+  // copy formatted output to a contiguous memory to be returned
+  memcpy(warpMask, warpMaskFormatted.pData, h * w * c * sizeof(double));
+
+  // clear c memory
+  MaskFormatted.clear();
+  vxFormatted.clear();
+  vyFormatted.clear();
+  warpMaskFormatted.clear();
+
+  return;
+}

@@ -12,3 +12,7 @@ extern void Coarse2FineFlowWrapper(double * vx, double * vy, double * warpI2,
                               int nSORIterations, int colType,
                               int h, int w, int c,
                               bool verbose, double threshold);
+
+extern void warpMaskFL(double *warpMask, const double *Mask,
+                        const double *vx, const double *vy,
+                        int colType, int h, int w, int c);
