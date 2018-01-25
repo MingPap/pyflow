@@ -6,6 +6,7 @@ from __future__ import print_function
 # from __future__ import unicode_literals
 import numpy as np
 cimport numpy as np
+from libcpp cimport bool
 # Author: Deepak Pathak (c) 2016
 
 cdef extern from "src/Coarse2FineFlowWrapper.h":
@@ -14,13 +15,15 @@ cdef extern from "src/Coarse2FineFlowWrapper.h":
                                   double alpha, double ratio, int minWidth,
                                   int nOuterFPIterations, int nInnerFPIterations,
                                   int nSORIterations, int colType,
-                                  int h, int w, int c);
+                                  int h, int w, int c, bool verbose, double threshold);
 
 def coarse2fine_flow(np.ndarray[double, ndim=3, mode="c"] Im1 not None,
                         np.ndarray[double, ndim=3, mode="c"] Im2 not None,
                         double alpha=1, double ratio=0.5, int minWidth=40,
                         int nOuterFPIterations=3, int nInnerFPIterations=1,
-                        int nSORIterations=20, int colType=0):
+                        int nSORIterations=20, int colType=0, 
+                        bool verbose = False,
+                        double threshold = 0.0):
     """
     Input Format:
       double * vx, double * vy, double * warpI2,
@@ -47,5 +50,7 @@ def coarse2fine_flow(np.ndarray[double, ndim=3, mode="c"] Im1 not None,
                             &Im1[0, 0, 0], &Im2[0, 0, 0],
                             alpha, ratio, minWidth, nOuterFPIterations,
                             nInnerFPIterations, nSORIterations, colType,
-                            h, w, c)
+                            h, w, c,
+                            verbose,
+                            threshold)
     return vx, vy, warpI2

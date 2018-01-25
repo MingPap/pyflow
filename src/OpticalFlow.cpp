@@ -5,6 +5,7 @@
 #include "ImageProcessing.h"
 #include "GaussianPyramid.h"
 #include <cstdlib>
+#include <cmath>
 #include <iostream>
 
 using namespace std;
@@ -194,7 +195,8 @@ void OpticalFlow::genInImageMask(DImage &mask, const DImage &flow,int interval)
 //
 //--------------------------------------------------------------------------------------------------------
 void OpticalFlow::SmoothFlowSOR(const DImage &Im1, const DImage &Im2, DImage &warpIm2, DImage &u, DImage &v,
-																    double alpha, int nOuterFPIterations, int nInnerFPIterations, int nSORIterations)
+																    double alpha, int nOuterFPIterations, int nInnerFPIterations, int nSORIterations,
+                                                    bool verbose, double threshold)
 {
 	DImage mask,imdx,imdy,imdt;
 	int imWidth,imHeight,nChannels,nPixels;
@@ -379,15 +381,19 @@ void OpticalFlow::SmoothFlowSOR(const DImage &Im1, const DImage &Im2, DImage &wa
 
 			du.reset();
 			dv.reset();
+         
+         bool use_converge_est = (threshold > 0.0);
 
-			for(int k = 0; k<nSORIterations; k++)
-				for(int i = 0; i<imHeight; i++)
+			for(int k = 0; k<nSORIterations; k++) {
+            double total_du_change = 0;
+            double total_dv_change = 0;
+
+				for(int i = 0; i<imHeight; i++) {
 					for(int j = 0; j<imWidth; j++)
 					{
 						int offset = i * imWidth+j;
 						double sigma1 = 0, sigma2 = 0, coeff = 0;
                         double _weight;
-
 
 						if(j>0)
 						{
@@ -420,14 +426,63 @@ void OpticalFlow::SmoothFlowSOR(const DImage &Im1, const DImage &Im2, DImage &wa
 						sigma1 *= -alpha;
 						sigma2 *= -alpha;
 						coeff *= alpha;
-						 // compute du
-						sigma1 += imdxy.data()[offset]*dv.data()[offset];
-						du.data()[offset] = (1-omega)*du.data()[offset] + omega/(imdx2.data()[offset] + alpha*0.05 + coeff)*(imdtdx.data()[offset] - sigma1);
-						// compute dv
-						sigma2 += imdxy.data()[offset]*du.data()[offset];
-						dv.data()[offset] = (1-omega)*dv.data()[offset] + omega/(imdy2.data()[offset] + alpha*0.05 + coeff)*(imdtdy.data()[offset] - sigma2);
-					}
-		}
+                  
+                  if(use_converge_est) {
+
+                      // compute du
+                     sigma1 += imdxy.data()[offset]*dv.data()[offset];
+
+                     double new_du = (1-omega)*du.data()[offset] + omega/(imdx2.data()[offset] + alpha*0.05 + coeff)*(imdtdx.data()[offset] - sigma1);
+                     total_du_change += abs(new_du - du.data()[offset]);
+
+                     /*
+                     double du_change = new_du - du.data()[offset];
+                     if(du_change < 0)
+                        du_change *= -1;
+                     total_du_change += du_change;
+                     */
+
+                     du.data()[offset] = new_du;
+                     // compute dv
+                     sigma2 += imdxy.data()[offset]*du.data()[offset];
+
+                     double new_dv = (1-omega)*dv.data()[offset] + omega/(imdy2.data()[offset] + alpha*0.05 + coeff)*(imdtdy.data()[offset] - sigma2);
+                     total_dv_change += abs(new_dv - dv.data()[offset]);
+                     /*
+                     double dv_change = new_dv - dv.data()[offset];
+                     if(dv_change < 0)
+                        dv_change *= -1;
+                     total_dv_change += dv_change;
+                     */
+
+                     dv.data()[offset] = new_dv;
+                  } else {
+                      
+                      // compute du
+                     sigma1 += imdxy.data()[offset]*dv.data()[offset];
+                     du.data()[offset] = (1-omega)*du.data()[offset] + omega/(imdx2.data()[offset] + alpha*0.05 + coeff)*(imdtdx.data()[offset] - sigma1);
+
+                     // compute dv
+                     sigma2 += imdxy.data()[offset]*du.data()[offset];
+                     dv.data()[offset] = (1-omega)*dv.data()[offset] + omega/(imdy2.data()[offset] + alpha*0.05 + coeff)*(imdtdy.data()[offset] - sigma2);
+
+                  } 
+					}  //End of image width loop
+            } // End of image height loop
+            
+            if(use_converge_est) {
+               // Compute the average change in the derivitives for each pixel
+               total_du_change /= imHeight * imWidth;
+               total_dv_change /= imHeight * imWidth;
+               
+               // Apply basic convergence thresholding
+               if(total_du_change < threshold && total_dv_change < threshold) {
+                  //cout << "Breaking early" << endl;
+                  break;
+               }
+            }
+         } // End of SOR Iterations Loops
+		} // End of Inner FP Iterations Loop
 		u.Add(du);
 		v.Add(dv);
 		if(interpolation == Bilinear)
@@ -447,9 +502,10 @@ void OpticalFlow::SmoothFlowSOR(const DImage &Im1, const DImage &Im2, DImage &wa
 			estGaussianMixture(Im1,warpIm2,GMPara);
 			break;
 		case Lap:
-			estLaplacianNoise(Im1,warpIm2,LapPara);
+			estLaplacianNoise(Im1,warpIm2,LapPara, verbose);
 		}
-	}
+
+	} // End of Outer FP Iterations Loop
 
 }
 
@@ -464,7 +520,8 @@ void OpticalFlow::SmoothFlowSOR(const DImage &Im1, const DImage &Im2, DImage &wa
 //
 //--------------------------------------------------------------------------------------------------------
 void OpticalFlow::SmoothFlowPDE(const DImage &Im1, const DImage &Im2, DImage &warpIm2, DImage &u, DImage &v,
-																    double alpha, int nOuterFPIterations, int nInnerFPIterations, int nCGIterations)
+																    double alpha, int nOuterFPIterations, int nInnerFPIterations, int nCGIterations,
+                                                    bool verbose)
 {
 	DImage mask,imdx,imdy,imdt;
 	int imWidth,imHeight,nChannels,nPixels;
@@ -755,7 +812,7 @@ void OpticalFlow::SmoothFlowPDE(const DImage &Im1, const DImage &Im2, DImage &wa
 			estGaussianMixture(Im1,warpIm2,GMPara);
 			break;
 		case Lap:
-			estLaplacianNoise(Im1,warpIm2,LapPara);
+			estLaplacianNoise(Im1,warpIm2,LapPara, verbose);
 		}
 
 	}// end of outer fixed point iteration
@@ -816,7 +873,7 @@ void OpticalFlow::estGaussianMixture(const DImage& Im1,const DImage& Im2,Gaussia
 	}
 }
 
-void OpticalFlow::estLaplacianNoise(const DImage& Im1,const DImage& Im2,Vector<double>& para)
+void OpticalFlow::estLaplacianNoise(const DImage& Im1,const DImage& Im2,Vector<double>& para, bool verbose)
 {
 	int nChannels = Im1.nchannels();
 	if(para.dim()!=nChannels)
@@ -843,8 +900,10 @@ void OpticalFlow::estLaplacianNoise(const DImage& Im1,const DImage& Im2,Vector<d
 	{
 		if(total[k]==0)
 		{
-			cout<<"All the pixels are invalid in estimation Laplacian noise!!!"<<endl;
-			cout<<"Something severely wrong happened!!!"<<endl;
+         if(verbose) {
+            cout<<"All the pixels are invalid in estimation Laplacian noise!!!"<<endl;
+            cout<<"Something severely wrong happened!!!"<<endl;
+         }
 			para[k] = 0.001;
 		}
 		else
@@ -941,16 +1000,16 @@ void OpticalFlow::testLaplacian(int dim)
 // function to perfomr coarse to fine optical flow estimation
 //--------------------------------------------------------------------------------------
 void OpticalFlow::Coarse2FineFlow(DImage &vx, DImage &vy, DImage &warpI2,const DImage &Im1, const DImage &Im2, double alpha, double ratio, int minWidth,
-																	 int nOuterFPIterations, int nInnerFPIterations, int nCGIterations)
+																	 int nOuterFPIterations, int nInnerFPIterations, int nCGIterations, bool verbose, double threshold)
 {
 	// first build the pyramid of the two images
 	GaussianPyramid GPyramid1;
 	GaussianPyramid GPyramid2;
-	if(IsDisplay)
+	if(verbose)
 		cout<<"Constructing pyramid...";
 	GPyramid1.ConstructPyramid(Im1,ratio,minWidth);
 	GPyramid2.ConstructPyramid(Im2,ratio,minWidth);
-	if(IsDisplay)
+	if(verbose)
 		cout<<"done!"<<endl;
 
 	// now iterate from the top level to the bottom
@@ -971,7 +1030,7 @@ void OpticalFlow::Coarse2FineFlow(DImage &vx, DImage &vy, DImage &warpI2,const D
 
 	for(int k=GPyramid1.nlevels()-1;k>=0;k--)
 	{
-		if(IsDisplay)
+		if(verbose)
 			cout<<"Pyramid level "<<k;
 		int width=GPyramid1.Image(k).width();
 		int height=GPyramid1.Image(k).height();
@@ -1002,10 +1061,10 @@ void OpticalFlow::Coarse2FineFlow(DImage &vx, DImage &vy, DImage &warpI2,const D
 		//SmoothFlowPDE(Image1,Image2,WarpImage2,vx,vy,alpha*pow((1/ratio),k),nOuterFPIterations,nInnerFPIterations,nCGIterations,GMPara);
 
 		//SmoothFlowPDE(Image1,Image2,WarpImage2,vx,vy,alpha,nOuterFPIterations,nInnerFPIterations,nCGIterations);
-		SmoothFlowSOR(Image1,Image2,WarpImage2,vx,vy,alpha,nOuterFPIterations+k,nInnerFPIterations,nCGIterations+k*3);
+		SmoothFlowSOR(Image1,Image2,WarpImage2,vx,vy,alpha,nOuterFPIterations+k,nInnerFPIterations,nCGIterations+k*3, verbose, threshold);
 
 		//GMPara.display();
-		if(IsDisplay)
+		if(verbose)
 			cout<<endl;
 	}
 	//warpFL(warpI2,Im1,Im2,vx,vy);
@@ -1014,7 +1073,7 @@ void OpticalFlow::Coarse2FineFlow(DImage &vx, DImage &vy, DImage &warpI2,const D
 }
 
 void OpticalFlow::Coarse2FineFlowLevel(DImage &vx, DImage &vy, DImage &warpI2,const DImage &Im1, const DImage &Im2, double alpha, double ratio, int nLevels,
-																	 int nOuterFPIterations, int nInnerFPIterations, int nCGIterations)
+																	 int nOuterFPIterations, int nInnerFPIterations, int nCGIterations, bool verbose)
 {
 	// first build the pyramid of the two images
 	GaussianPyramid GPyramid1;
@@ -1022,7 +1081,7 @@ void OpticalFlow::Coarse2FineFlowLevel(DImage &vx, DImage &vy, DImage &warpI2,co
 	GaussianPyramid GFlow;
 	DImage flow;
 	AssembleFlow(vx,vy,flow);
-	if(IsDisplay)
+	if(verbose)
 		cout<<"Constructing pyramid...";
 	GPyramid1.ConstructPyramidLevels(Im1,ratio,nLevels);
 	GPyramid2.ConstructPyramidLevels(Im2,ratio,nLevels);
@@ -1031,7 +1090,7 @@ void OpticalFlow::Coarse2FineFlowLevel(DImage &vx, DImage &vy, DImage &warpI2,co
 	flow.Multiplywith(pow(ratio,nLevels-1));
 	DissembleFlow(flow,vx,vy);
 
-	if(IsDisplay)
+	if(verbose)
 		cout<<"done!"<<endl;
 
 	// now iterate from the top level to the bottom
@@ -1052,7 +1111,7 @@ void OpticalFlow::Coarse2FineFlowLevel(DImage &vx, DImage &vy, DImage &warpI2,co
 
 	for(int k=GPyramid1.nlevels()-1;k>=0;k--)
 	{
-		if(IsDisplay)
+		if(verbose)
 			cout<<"Pyramid level "<<k;
 		int width=GPyramid1.Image(k).width();
 		int height=GPyramid1.Image(k).height();
@@ -1073,9 +1132,9 @@ void OpticalFlow::Coarse2FineFlowLevel(DImage &vx, DImage &vy, DImage &warpI2,co
 		//SmoothFlowPDE(GPyramid1.Image(k),GPyramid2.Image(k),warpI2,vx,vy,alpha,nOuterFPIterations,nInnerFPIterations,nCGIterations);
 		//SmoothFlowPDE(Image1,Image2,WarpImage2,vx,vy,alpha*pow((1/ratio),k),nOuterFPIterations,nInnerFPIterations,nCGIterations,GMPara);
 
-		SmoothFlowPDE(Image1,Image2,WarpImage2,vx,vy,alpha,nOuterFPIterations,nInnerFPIterations,nCGIterations);
+		SmoothFlowPDE(Image1,Image2,WarpImage2,vx,vy,alpha,nOuterFPIterations,nInnerFPIterations,nCGIterations, verbose);
 		//GMPara.display();
-		if(IsDisplay)
+		if(verbose)
 			cout<<endl;
 	}
 	//warpFL(warpI2,Im1,Im2,vx,vy);
