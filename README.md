@@ -12,14 +12,25 @@ For more information about Deepak's wrapper, see [here](https://github.com/patha
 
 ## Setup instructions (all platforms)
 
-Run the following steps to download, install and demo the library:
+First, make sure the `cython` package has been installed as part of your `virtualenv` or `conda` environment.  
+Then, to install this version of `pyflow`, use `pip` as follows:
 
-To install this package, use `pip` as follows:
+```
+(dlwin36tfvos) pferr@MSI E:\repos                                                                                 
+$ pip install git+https://github.com/philferriere/pyflow.git                                                      
+Collecting git+https://github.com/philferriere/pyflow.git                                                         
+  Cloning https://github.com/philferriere/pyflow.git to c:\users\pferr\appdata\local\temp\pip-amvdc0ec-build      
+Installing collected packages: pyflow                                                                             
+  Running setup.py install for pyflow ... done                                                                    
+Successfully installed pyflow-1.0                                                                                 
+```
 
-```shell
-(dlwin36coco) pferr@MSI e:\repos
-$ pip install git+https://github.com/philferriere/pyflow.git
-TODO - copy log here
+Note: If `distutils` uses a different compiler than `cl.exe`, modify its configuration file as follows:
+```
+(dlwin36tfvos) pferr@MSI E:\repos
+$ cat %CONDA_PREFIX%\Lib\distutils\distutils.cfg
+[build]
+compiler=msvc
 ```
 
 ## Additional setup instructions (Windows 10)
