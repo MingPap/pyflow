@@ -17,9 +17,9 @@ import numpy
 sourcefiles = ['pyflow.pyx', ]
 sourcefiles.extend(glob("src/*.cpp"))
 if sys.platform.startswith("win"):
-  extensions = [Extension("pyflow", sourcefiles, include_dirs=[numpy.get_include()])]
+  extensions = [Extension("pyflow", sourcefiles, include_dirs=[numpy.get_include()], extra_compile_args=["/openmp"])]
 else:
-  extensions = [Extension("pyflow", sourcefiles, include_dirs=[numpy.get_include()], extra_compile_args=["-D_LINUX_MAC"])]
+  extensions = [Extension("pyflow", sourcefiles, include_dirs=[numpy.get_include()], extra_compile_args=["-D_LINUX_MAC", "-fopenmp"], extra_link_args=["-lgomp"])]
 
 setup(
   name="pyflow",

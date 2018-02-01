@@ -393,7 +393,7 @@ void OpticalFlow::SmoothFlowSOR(const DImage &Im1, const DImage &Im2, DImage &wa
 			for(int k = 0; k<nSORIterations; k++) {
             double total_du_change = 0;
             double total_dv_change = 0;
-
+#pragma omp parallel for
 				for(int i = 0; i<imHeight; i++) {
 					for(int j = 0; j<imWidth; j++)
 					{
